@@ -4,11 +4,13 @@
 authorX="Anthony G. Kerr"
 contactX="a2kerr@hotmail.com"
 dateOG="July 08, 2018"
-dateX="February 12, 2020"
+dateX="April 10, 2020"
 productX="Flasher and Erase Helper Program"
 statementX="A little \"esptool\" helper script for:\nESP82666 and ESP32 "
 references="\n- http://docs.micropython.org/en/latest/esp8266/tutorial/intro.html#deploying-the-firmware
 \n- https://micropython.org/download#esp8266\n\n"
+
+message_flash="The write_flash command always verifies the MD5 hash of data which is written to flash, so additional verification is not usually needed. However, if you wish to perform a byte-by-byte verification of the flash contents (and optionally print the differences to the console) then you can do so with this command:"
 
 #set argument list globally
 declare -A config_meta 
@@ -200,28 +202,26 @@ function get_usbPort(){
 # Get Baud rate of MCU 
 function get_Baud(){
 	show_header "Getting Baud Rate"
-	# usbPortX="./*.bin"
+    #TODO: Added message for recommended baud speeds
+    message1="The baud rate is limited to 115200 when esptool/esptool.py establishes the initial connection, higher speeds are only used for data transfers.\n
+Most hardware configurations will work with -b 230400, some with -b \e[0;36m460800(Works Well)\e[0m, -b 921600 and/or -b 1500000 or higher.\n
+If you have connectivity problems then you can also set baud rates below 115200. You can also choose 74880, which is the usual baud rate used by the ESP8266 to output boot log information.\n"
+    printf "\n${message1}\n\n"
+    
 	usbPortList=( 115200 1500000 921600 460800 230400 74880 9600)
-	# getLastCommandStatus=$(echo $?)
-	# if [ $getLastCommandStatus != 0 ]; then
-			# printf "\nNO PORT NOT FOUND"
-		# else 
 	for indexX in ${!usbPortList[@]}; do
 		printf "$indexX) ${usbPortList[$indexX]}\n"
 	done
-	# fi
+    printf "\nSelect Baud Rate: "
 	read selectionY
-	#if [ $selectionY == "q" ] || [ $selectionY -le 5 ]
 	if [ "$selectionY" != "" ];	then
 		config_meta[baud]=${usbPortList[$selectionY]}
 		printf "Buad = ${config_meta[baud]}" 
 		return ${selectionY}
 	else
 		config_meta[baud]="???"
-		printf "Invalid argument: ${config_meta[baud]}\n
-The baud rate is limited to 115200 when esptool/esptool.py establishes the initial connection, higher speeds are only used for data transfers.\n
-Most hardware configurations will work with -b 230400, some with -b 460800, -b 921600 and/or -b 1500000 or higher.\n
-If you have connectivity problems then you can also set baud rates below 115200. You can also choose 74880, which is the usual baud rate used by the ESP8266 to output boot log information.\n"
+		printf "\n\nInvalid argument: ${config_meta[baud]}\n\n${message1}"
+
 		return 255
 	fi
 }
@@ -316,6 +316,7 @@ function get_State(){
 #Flash 4mb continious
 function flash4mbCombine(){
 	show_header "IN: flash4mbCombine"
+    printf "\n${message_flash}\n\n"
 	if [[ ${config_meta[chip]} == "esp8266" ]]; then
 		printf "\nFlash ESP8266!!!\n"
 		$(echo ${config_meta[tool]} --port ${config_meta[port]} --baud ${config_meta[baud]} --chip ${config_meta[chip]} write_flash --flash_size=detect 0x0 ${config_meta[firmware]})
@@ -394,23 +395,35 @@ function set_flash_tool(){
 }
 
 # TESTING CODE
-function test(){
-	show_header "Set Flash Tool"
-	usbPortList=( 'esptool' 'esptool.py')
-	for indexX in ${!usbPortList[@]}; do
-		printf "$indexX) ${usbPortList[$indexX]}\n"
-	done
-	read selectionY
-	if [ "$selectionY" != "" ];	then
-		config_meta[tool]=${usbPortList[$selectionY]}
-		printf "Tool = ${config_meta[tool]}" 
-        $( echo ${config_meta[tool]})
-		return ${selectionY}
-	else
-		config_meta[tool]="???"
-		printf "Invalid argument: ${config_meta[tool]}\n"
-    fi
+function verify_flash(){
+	show_header "IN: Verify Flash Memory"
+    printf "\n${message_flash}\n\n"
+    esptool_template="${config_meta[tool]} --port ${config_meta[port]} --baud ${config_meta[baud]} --chip ${config_meta[chip]} verify_flash --diff yes 0x1000 ${config_meta[firmware]}"
     
+	if [[ ${config_meta[chip]} == "esp8266" ]]; then
+		printf "\nVerifing ESP8266 Flash Memory\n"
+        $(echo ${esptool_template})
+	elif [[ ${config_meta[chip]} == "esp32" ]]; then
+		printf "\nVerifying ESP32 Flash Memory\n"
+        $(echo ${esptool_template})
+	else 
+		printf "Exiting no Chip ID found!"
+	fi
+}
+
+# TESTING CODE
+function test(){
+	show_header "IN: Test"
+    esptool_template="${config_meta[tool]} --port ${config_meta[port]} --baud ${config_meta[baud]} --chip ${config_meta[chip]} verify_flash --diff yes 0x1000 ${config_meta[firmware]}"
+	if [[ ${config_meta[chip]} == "esp8266" ]]; then
+		printf "\nIn Test ESP8266!!!\n"
+        $(echo ${esptool_template})
+	elif [[ ${config_meta[chip]} == "esp32" ]]; then
+		printf "\nIn Test ESP32!!!\n"
+        $(echo ${esptool_template})
+	else 
+		printf "Exiting no Chip ID found!"
+	fi
 }
 
 #**** Main Menu ****
@@ -433,7 +446,8 @@ function show_MainMenu(){
 	printf "\n9) Program Flash: Combine 4MB"
 	printf "\n10) Program Flash: Segment 4MB"
 	printf "\n11) Program Flash: BLANK!"
-	printf "\n12) TEST: "
+	printf "\n12) Verify Flash Memory: "
+	printf "\n13) TEST: "
 	printf "\n *** HIT q TO QUIT! ***\n"
 	read selectionY
 	#if [ $selectionY == "q" ] || [ $selectionY -le 5 ]
@@ -500,7 +514,11 @@ function set_ParseMenu(){
 			printf "= ${selectionY}\n"
 			set_flash_tool
 			;; 
-		12)  printf "TESTING CODE:\n" #12) TESTING CODE
+		12)  printf "Verify Flash Memory:\n" #12) Verify Flash Memory
+			printf "= ${selectionY}\n"
+			verify_flash
+			;; 
+		13)  printf "TESTING CODE:\n" #13) TESTING CODE
 			printf "= ${selectionY}\n"
 			test
 			;; 
