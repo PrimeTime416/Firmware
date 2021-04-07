@@ -4,7 +4,7 @@
 authorX="Anthony G. Kerr"
 contactX="a2kerr@hotmail.com"
 dateOG="July 08, 2018"
-dateX="April 10, 2020"
+dateX="April 06, 2021"
 productX="Flasher and Erase Helper Program"
 statementX="A little \"esptool\" helper script for:\nESP82666 and ESP32 "
 references="\n- http://docs.micropython.org/en/latest/esp8266/tutorial/intro.html#deploying-the-firmware
